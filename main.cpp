@@ -29,11 +29,11 @@
 #include <unordered_map>
 #include <vector>
 
-const uint32_t WIDTH = 800;
-const uint32_t HEIGHT = 600;
+const uint32_t WIDTH = 1280;
+const uint32_t HEIGHT = 720;
 
-const std::string MODEL_PATH = "models/viking_room.obj";
-const std::string TEXTURE_PATH = "textures/viking_room.png";
+const std::string MODEL_PATH = "models/wall.obj";
+const std::string TEXTURE_PATH = "textures/texture.png";
 
 const int MAX_FRAMES_IN_FLIGHT = 2;
 
@@ -161,9 +161,9 @@ struct Camera {
 };
 
 float sensitivity = 1.1f;
-float last_x = 400, last_y = 300;
+float last_x = WIDTH/2, last_y = HEIGHT/2;
 Camera camera{glm::mat4(1.0f),
-              glm::vec3(0.0f, 3.0f, 0.0f),
+              glm::vec3(0.0f, 0.0f, 5.0f),
               glm::vec3(0.0f, 0.0f, -1.0f),
               glm::vec3(0.0f, 1.0f, 0.0f),
               glm::vec3(1.0f),
@@ -173,8 +173,6 @@ Camera camera{glm::mat4(1.0f),
 class HelloTriangleApplication {
 public:
   void run() {
-    camera.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-
     initWindow();
     initVulkan();
     mainLoop();
