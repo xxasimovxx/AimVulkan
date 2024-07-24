@@ -161,7 +161,7 @@ struct Camera {
 };
 
 float sensitivity = 1.1f;
-float last_x = WIDTH/2, last_y = HEIGHT/2;
+float last_x = WIDTH / 2, last_y = HEIGHT / 2;
 Camera camera{glm::mat4(1.0f),
               glm::vec3(0.0f, 0.0f, 5.0f),
               glm::vec3(0.0f, 0.0f, -1.0f),
@@ -169,6 +169,14 @@ Camera camera{glm::mat4(1.0f),
               glm::vec3(1.0f),
               -90.0f,
               0.0f};
+
+VkDevice device;
+VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+VkQueue graphicsQueue;
+VkCommandPool commandPool;
+VkDescriptorPool descriptorPool;
+
+ModelLoader model;
 
 class HelloTriangleApplication {
 public:
@@ -186,10 +194,6 @@ private:
   VkDebugUtilsMessengerEXT debugMessenger;
   VkSurfaceKHR surface;
 
-  VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-  VkDevice device;
-
-  VkQueue graphicsQueue;
   VkQueue presentQueue;
 
   VkSwapchainKHR swapChain;
@@ -203,8 +207,6 @@ private:
   VkDescriptorSetLayout descriptorSetLayout;
   VkPipelineLayout pipelineLayout;
   VkPipeline graphicsPipeline;
-
-  VkCommandPool commandPool;
 
   VkImage depthImage;
   VkDeviceMemory depthImageMemory;
@@ -226,19 +228,15 @@ private:
   std::vector<VkDeviceMemory> uniformBuffersMemory;
   std::vector<void *> uniformBuffersMapped;
 
-  VkDescriptorPool descriptorPool;
   std::vector<VkDescriptorSet> descriptorSets;
 
   std::vector<VkCommandBuffer> commandBuffers;
-
   std::vector<VkSemaphore> imageAvailableSemaphores;
   std::vector<VkSemaphore> renderFinishedSemaphores;
   std::vector<VkFence> inFlightFences;
   uint32_t currentFrame = 0;
 
   UniformBufferObject ubo{};
-
-
 
   bool framebufferResized = false;
 
@@ -1487,8 +1485,11 @@ private:
                      .count();
 
     ubo.model = glm::mat4(1.0f);
-    ubo.view = glm::lookAt(camera.camera_position, camera.camera_position + camera.camera_front, camera.camera_up);
-    // ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.view = glm::lookAt(camera.camera_position,
+                           camera.camera_position + camera.camera_front,
+                           camera.camera_up);
+    // ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f,
+    // 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     ubo.proj = glm::perspective(
         glm::radians(45.0f),
         swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
@@ -1506,19 +1507,20 @@ private:
     xoffset *= sensitivity;
     yoffset *= sensitivity;
 
-    camera.yaw   += xoffset;
-      camera.pitch += yoffset;
+    camera.yaw += xoffset;
+    camera.pitch += yoffset;
 
-      if(camera.pitch > 89.0f)
-        camera.pitch =  89.0f;
-      if(camera.pitch < -89.0f)
-        camera.pitch = -89.0f;
+    if (camera.pitch > 89.0f)
+      camera.pitch = 89.0f;
+    if (camera.pitch < -89.0f)
+      camera.pitch = -89.0f;
 
-      camera.direction.x = cos(glm::radians(camera.yaw)) * cos(glm::radians(camera.pitch));
-      camera.direction.y = sin(glm::radians(camera.pitch));
-      camera.direction.z = sin(glm::radians(camera.yaw)) * cos(glm::radians(camera.pitch));
-      camera.camera_front = glm::normalize(camera.direction);
-
+    camera.direction.x =
+        cos(glm::radians(camera.yaw)) * cos(glm::radians(camera.pitch));
+    camera.direction.y = sin(glm::radians(camera.pitch));
+    camera.direction.z =
+        sin(glm::radians(camera.yaw)) * cos(glm::radians(camera.pitch));
+    camera.camera_front = glm::normalize(camera.direction);
   }
   void drawFrame() {
     vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE,
@@ -1820,7 +1822,218 @@ private:
     return VK_FALSE;
   }
 };
+class ModelLoader{
+public:
+  ModelLoader(){}
+  std::vector<Vertex> vertices;
+  std::vector<uint32_t> indices;
+  VkBuffer vertexBuffer;
+  VkDeviceMemory vertexBufferMemory;
+  VkBuffer indexBuffer;
+  VkDeviceMemory indexBufferMemory;
 
+  void Load(const char *Path) {
+    loadModel(Path);
+    createVertexBuffer();
+    createIndexBuffer();
+  }
+
+  void Destroy() {
+    vkDestroyBuffer(device, indexBuffer, nullptr);
+    vkFreeMemory(device, indexBufferMemory, nullptr);
+
+    vkDestroyBuffer(device, vertexBuffer, nullptr);
+    vkFreeMemory(device, vertexBufferMemory, nullptr);
+  }
+
+  void Render(VkCommandBuffer commandBuffer) {
+    VkBuffer vertexBuffers[] = {vertexBuffer};
+    VkDeviceSize offsets[] = {0};
+    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+
+    vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0,
+                     0, 0);
+  }
+
+private:
+  VkCommandBuffer beginSingleTimeCommands() {
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandPool = commandPool;
+    allocInfo.commandBufferCount = 1;
+
+    VkCommandBuffer commandBuffer;
+    vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+    return commandBuffer;
+  }
+
+  void endSingleTimeCommands(VkCommandBuffer commandBuffer) {
+    vkEndCommandBuffer(commandBuffer);
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+
+    vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(graphicsQueue);
+
+    vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+  }
+
+  void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
+    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
+    VkBufferCopy copyRegion{};
+    copyRegion.size = size;
+    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+
+    endSingleTimeCommands(commandBuffer);
+  }
+
+  uint32_t findMemoryType(uint32_t typeFilter,
+                          VkMemoryPropertyFlags properties) {
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+      if ((typeFilter & (1 << i)) &&
+          (memProperties.memoryTypes[i].propertyFlags & properties) ==
+              properties) {
+        return i;
+      }
+    }
+
+    throw std::runtime_error("failed to find suitable memory type!");
+  }
+
+  void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
+                    VkMemoryPropertyFlags properties, VkBuffer &buffer,
+                    VkDeviceMemory &bufferMemory) {
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = size;
+    bufferInfo.usage = usage;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+      throw std::runtime_error("failed to create buffer!");
+    }
+
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex =
+        findMemoryType(memRequirements.memoryTypeBits, properties);
+
+    if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) !=
+        VK_SUCCESS) {
+      throw std::runtime_error("failed to allocate buffer memory!");
+    }
+
+    vkBindBufferMemory(device, buffer, bufferMemory, 0);
+  }
+  void loadModel(const char *Path) {
+    tinyobj::attrib_t attrib;
+    std::vector<tinyobj::shape_t> shapes;
+    std::vector<tinyobj::material_t> materials;
+    std::string warn, err;
+
+    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, Path)) {
+      throw std::runtime_error(warn + err);
+    }
+
+    std::unordered_map<Vertex, uint32_t> uniqueVertices{};
+
+    for (const auto &shape : shapes) {
+      for (const auto &index : shape.mesh.indices) {
+        Vertex vertex{};
+
+        vertex.pos = {attrib.vertices[3 * index.vertex_index + 0],
+                      attrib.vertices[3 * index.vertex_index + 1],
+                      attrib.vertices[3 * index.vertex_index + 2]};
+
+        vertex.texCoord = {attrib.texcoords[2 * index.texcoord_index + 0],
+                           1.0f -
+                               attrib.texcoords[2 * index.texcoord_index + 1]};
+
+        vertex.color = {1.0f, 1.0f, 1.0f};
+
+        if (uniqueVertices.count(vertex) == 0) {
+          uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+          vertices.push_back(vertex);
+        }
+
+        indices.push_back(uniqueVertices[vertex]);
+      }
+    }
+  }
+
+  void createVertexBuffer() {
+    VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 stagingBuffer, stagingBufferMemory);
+
+    void *data;
+    vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+    memcpy(data, vertices.data(), (size_t)bufferSize);
+    vkUnmapMemory(device, stagingBufferMemory);
+
+    createBuffer(
+        bufferSize,
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
+
+    copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+
+    vkDestroyBuffer(device, stagingBuffer, nullptr);
+    vkFreeMemory(device, stagingBufferMemory, nullptr);
+  }
+
+  void createIndexBuffer() {
+    VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 stagingBuffer, stagingBufferMemory);
+
+    void *data;
+    vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+    memcpy(data, indices.data(), (size_t)bufferSize);
+    vkUnmapMemory(device, stagingBufferMemory);
+
+    createBuffer(
+        bufferSize,
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+
+    copyBuffer(stagingBuffer, indexBuffer, bufferSize);
+
+    vkDestroyBuffer(device, stagingBuffer, nullptr);
+    vkFreeMemory(device, stagingBufferMemory, nullptr);
+  }
+};
 int main() {
   HelloTriangleApplication app;
 
