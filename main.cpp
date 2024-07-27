@@ -1,4 +1,5 @@
 #include <glm/ext/matrix_float4x4.hpp>
+#include <vulkan/vulkan_core.h>
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -32,7 +33,7 @@
 const uint32_t WIDTH = 1280;
 const uint32_t HEIGHT = 720;
 
-const std::string MODEL_PATH = "models/wall.obj";
+// const std::string MODEL_PATH = "models/wall.obj";
 const std::string TEXTURE_PATH = "textures/texture.png";
 
 const int MAX_FRAMES_IN_FLIGHT = 2;
@@ -479,9 +480,9 @@ private:
     createCommandPool();
     createDepthResources();
     createFramebuffers();
-    // createTextureImage();
-    // createTextureImageView();
-    // createTextureSampler();
+    createTextureImage();
+    createTextureImageView();
+    createTextureSampler();
     // loadModel();
     // createVertexBuffer();
     // createIndexBuffer();
@@ -531,6 +532,9 @@ private:
     }
 
     vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+    vkDestroyDescriptorSetLayout(device,  descriptorSetLayout, nullptr);
+
+    model.Destroy();
 
     vkDestroySampler(device, textureSampler, nullptr);
     vkDestroyImageView(device, textureImageView, nullptr);
@@ -538,7 +542,6 @@ private:
     vkDestroyImage(device, textureImage, nullptr);
     vkFreeMemory(device, textureImageMemory, nullptr);
 
-    model.Destroy();
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
       vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
