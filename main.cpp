@@ -1,4 +1,7 @@
 #include <glm/ext/matrix_float4x4.hpp>
+#include <glm/ext/matrix_transform.hpp>
+#include <glm/ext/vector_float3.hpp>
+#include <glm/geometric.hpp>
 #include <vulkan/vulkan_core.h>
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -161,21 +164,23 @@ struct Camera {
   float pitch;
 };
 
-float sensitivity = 1.1f;
+float sensitivity = 0.1f;
 float last_x = WIDTH / 2, last_y = HEIGHT / 2;
-Camera camera{glm::mat4(1.0f),
-              glm::vec3(0.0f, 0.0f, 5.0f),
+Camera camera{glm::mat4(0.0f),
+              glm::vec3(0.0f, 0.0f, 0.0f),
               glm::vec3(0.0f, 0.0f, -1.0f),
               glm::vec3(0.0f, 1.0f, 0.0f),
-              glm::vec3(1.0f),
+              glm::vec3(0.0f, 0.0f, 0.0f),
               -90.0f,
               0.0f};
+
 
 VkDevice device;
 VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 VkQueue graphicsQueue;
 VkCommandPool commandPool;
 VkDescriptorPool descriptorPool;
+
 
 class ModelLoader{
 public:
@@ -992,10 +997,17 @@ private:
         static_cast<uint32_t>(dynamicStates.size());
     dynamicState.pDynamicStates = dynamicStates.data();
 
+    VkPushConstantRange psRange{};
+    psRange.offset = 0;
+    psRange.size = sizeof(glm::mat4);
+    psRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+    pipelineLayoutInfo.pushConstantRangeCount = 1;
+    pipelineLayoutInfo.pPushConstantRanges = &psRange;
 
     if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr,
                                &pipelineLayout) != VK_SUCCESS) {
@@ -1316,7 +1328,7 @@ private:
     std::string warn, err;
 
     if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err,
-                          MODEL_PATH.c_str())) {
+                          "asd")) {
       throw std::runtime_error(warn + err);
     }
 
@@ -1637,6 +1649,9 @@ private:
                             pipelineLayout, 0, 1, &descriptorSets[currentFrame],
                             0, nullptr);
 
+    glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -5.0f));
+    vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &transform);
+
     model.Render( commandBuffer);
     vkCmdEndRenderPass(commandBuffer);
 
@@ -1681,11 +1696,10 @@ private:
                      .count();
 
     ubo.model = glm::mat4(1.0f);
+    // ubo.view = glm::lookAt(camera.camera_front, glm::vec3(0.0f, 0.0f, -5.0f), camera.camera_up);
     ubo.view = glm::lookAt(camera.camera_position,
-                           camera.camera_position + camera.camera_front,
+                           camera.camera_position + camera.camera_front + glm::vec3(0.0f,-0.5f,0.0f),
                            camera.camera_up);
-    // ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f,
-    // 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     ubo.proj = glm::perspective(
         glm::radians(45.0f),
         swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
