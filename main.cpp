@@ -33,6 +33,11 @@
 #include <unordered_map>
 #include <vector>
 
+bool isKeyPressed = false;
+
+int last_key_state = -1;
+int key_state = last_key_state;
+
 const uint32_t WIDTH = 1280;
 const uint32_t HEIGHT = 720;
 
@@ -163,6 +168,7 @@ struct Camera {
   float yaw;
   float pitch;
 };
+glm::vec3 center = glm::vec3(-7.01f, -7.034f, -7.0f);
 
 float sensitivity = 0.1f;
 float last_x = WIDTH / 2, last_y = HEIGHT / 2;
@@ -170,7 +176,7 @@ Camera camera{glm::mat4(0.0f),
               glm::vec3(0.0f, 0.0f, 0.0f),
               glm::vec3(0.0f, 0.0f, -1.0f),
               glm::vec3(0.0f, 1.0f, 0.0f),
-              glm::vec3(0.0f, 0.0f, 0.0f),
+              glm::vec3(0.0f, 0.0f, -1.0f),
               -90.0f,
               0.0f};
 
@@ -450,6 +456,7 @@ private:
   bool framebufferResized = false;
 
   void initWindow() {
+
     glfwInit();
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -459,6 +466,7 @@ private:
     glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetKeyCallback(window, key_callback);
     // if (glfwRawMouseMotionSupported()){
     //     glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
     // }
@@ -503,6 +511,14 @@ private:
     while (!glfwWindowShouldClose(window)) {
       glfwPollEvents();
       drawFrame();
+
+      // std::cout << camera.camera_front.x;
+      // std::cout << " ";
+      // std::cout << camera.camera_front.y;
+      // std::cout << " ";
+      // std::cout << camera.camera_front.z;
+      // // asd
+      // std::cout << "\n";
     }
 
     vkDeviceWaitIdle(device);
@@ -1655,6 +1671,13 @@ private:
     model.Render( commandBuffer);
     vkCmdEndRenderPass(commandBuffer);
 
+    camera.camera_front = glm::normalize(center);
+    camera.camera_up = glm::normalize(glm::cross(camera.camera_position, camera.camera_front));
+    std::cout << camera.camera_up.x;
+    std::cout << "\n";
+    std::cout << camera.camera_up.y;
+    std::cout << "\n";
+    std::cout << camera.camera_up.z;
 		if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
 			throw std::runtime_error("failed to record command buffer!");
 		}
@@ -1697,16 +1720,54 @@ private:
 
     ubo.model = glm::mat4(1.0f);
     // ubo.view = glm::lookAt(camera.camera_front, glm::vec3(0.0f, 0.0f, -5.0f), camera.camera_up);
-    ubo.view = glm::lookAt(camera.camera_position,
-                           camera.camera_position + camera.camera_front + glm::vec3(0.0f,-0.5f,0.0f),
+    camera.view = glm::lookAt(camera.camera_position,
+                           glm::normalize(camera.camera_position + camera.camera_front),
                            camera.camera_up);
+    ubo.view = camera.view;
     ubo.proj = glm::perspective(
         glm::radians(45.0f),
-        swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
+        swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 15.0f);
     ubo.proj[1][1] *= -1;
 
     memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
   }
+  static void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods){
+
+
+    if(action != last_key_state){
+
+      key_state = action;
+
+    }
+
+    if(key_state){
+
+      switch(key){
+
+      case GLFW_KEY_ESCAPE:
+        glfwSetWindowShouldClose(window, true);
+        break;
+
+      case GLFW_KEY_W:
+      camera.camera_front.y += 0.1f;
+        break;
+
+      case GLFW_KEY_S:
+
+      camera.camera_front.y -= 0.1f;
+        break;
+
+      case GLFW_KEY_A:
+      camera.camera_front.x -= 0.1f;
+        break;
+
+      case GLFW_KEY_D:
+      camera.camera_front.x += + 0.1f;
+        break;
+      }
+    }
+    }
+
 
   static void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
     float xoffset = xpos - last_x;
@@ -2037,10 +2098,12 @@ int main() {
 
   try {
     app.run();
+
   } catch (const std::exception &e) {
     std::cerr << e.what() << std::endl;
     return EXIT_FAILURE;
   }
+
 
   return EXIT_SUCCESS;
 }
