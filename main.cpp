@@ -168,7 +168,7 @@ struct Camera {
   float yaw;
   float pitch;
 };
-glm::vec3 center = glm::vec3(-7.01f, -7.034f, -7.0f);
+glm::vec3 center = glm::vec3(0.0313891f, 0.00000000650186f, -0.9995070f);
 
 float sensitivity = 0.1f;
 float last_x = WIDTH / 2, last_y = HEIGHT / 2;
@@ -508,7 +508,10 @@ private:
   }
 
   void mainLoop() {
+
+    camera.camera_front = glm::normalize(camera.direction + center);
     while (!glfwWindowShouldClose(window)) {
+      std::cout << camera.camera_front.x << " " << camera.camera_front.y << " " << camera.camera_front.z;
       glfwPollEvents();
       drawFrame();
 
@@ -1671,8 +1674,7 @@ private:
     model.Render( commandBuffer);
     vkCmdEndRenderPass(commandBuffer);
 
-    camera.camera_front = glm::normalize(center);
-    camera.camera_up = glm::normalize(glm::cross(camera.camera_position, camera.camera_front));
+    // camera.camera_up = glm::normalize(glm::cross(camera.camera_position, camera.camera_front));
     std::cout << camera.camera_up.x;
     std::cout << "\n";
     std::cout << camera.camera_up.y;
