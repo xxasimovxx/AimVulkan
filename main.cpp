@@ -13,7 +13,7 @@
 #include <glm/gtx/hash.hpp>
 
 #define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
+#include "include/stb_image.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "include/tiny_obj_loader.h"
@@ -34,6 +34,7 @@
 #include <vector>
 
 bool isKeyPressed = false;
+bool noMouseActionDone = true;
 
 int last_key_state = -1;
 int key_state = last_key_state;
@@ -168,7 +169,7 @@ struct Camera {
   float yaw;
   float pitch;
 };
-glm::vec3 center = glm::vec3(0.0313891f, 0.00000000650186f, -0.9995070f);
+glm::vec3 center = glm::vec3(0.0f, 0.0f, 0.0f);
 
 float sensitivity = 0.1f;
 float last_x = WIDTH / 2, last_y = HEIGHT / 2;
@@ -465,11 +466,14 @@ private:
     glfwSetWindowUserPointer(window, this);
     glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetKeyCallback(window, key_callback);
     // if (glfwRawMouseMotionSupported()){
     //     glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
     // }
+
+    glfwSetCursorPos(window, WIDTH/2, HEIGHT/2);
   }
 
   static void framebufferResizeCallback(GLFWwindow *window, int width,
@@ -1772,6 +1776,11 @@ private:
 
 
   static void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
+    if(noMouseActionDone){
+    	glfwSetCursorPos(window, WIDTH/2, HEIGHT/2);
+	noMouseActionDone = false;
+
+    }
     float xoffset = xpos - last_x;
     float yoffset = last_y - ypos;
     last_x = xpos;
@@ -1794,6 +1803,7 @@ private:
     camera.direction.z =
         sin(glm::radians(camera.yaw)) * cos(glm::radians(camera.pitch));
     camera.camera_front = glm::normalize(camera.direction);
+
   }
   void drawFrame() {
     vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE,
