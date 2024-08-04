@@ -397,6 +397,7 @@ public:
   void run() {
     initWindow();
     initVulkan();
+//    glfwSetCursorPos(window, WIDTH/2, HEIGHT/2);
     mainLoop();
     cleanup();
   }
@@ -427,6 +428,7 @@ private:
   VkImageView depthImageView;
 
   ModelLoader model;
+  ModelLoader crosshair;
 
   VkImage textureImage;
   VkDeviceMemory textureImageMemory;
@@ -473,7 +475,6 @@ private:
     //     glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
     // }
 
-    glfwSetCursorPos(window, WIDTH/2, HEIGHT/2);
   }
 
   static void framebufferResizeCallback(GLFWwindow *window, int width,
@@ -504,6 +505,7 @@ private:
     // createVertexBuffer();
     // createIndexBuffer();
     model.Load("models/wall.obj");
+    crosshair.Load("models/crosshair.obj");
     createUniformBuffers();
     createDescriptorPool();
     createDescriptorSets();
@@ -512,10 +514,8 @@ private:
   }
 
   void mainLoop() {
-
     camera.camera_front = glm::normalize(camera.direction + center);
     while (!glfwWindowShouldClose(window)) {
-      std::cout << camera.camera_front.x << " " << camera.camera_front.y << " " << camera.camera_front.z;
       glfwPollEvents();
       drawFrame();
 
@@ -563,6 +563,7 @@ private:
     vkDestroyDescriptorSetLayout(device,  descriptorSetLayout, nullptr);
 
     model.Destroy();
+    crosshair.Destroy();
 
     vkDestroySampler(device, textureSampler, nullptr);
     vkDestroyImageView(device, textureImageView, nullptr);
@@ -1675,15 +1676,13 @@ private:
     glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -5.0f));
     vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &transform);
 
-    model.Render( commandBuffer);
+    model.Render(commandBuffer);
+
+    transform = glm::inverse(camera.view);
+    vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &transform);
+    crosshair.Render(commandBuffer);
     vkCmdEndRenderPass(commandBuffer);
 
-    // camera.camera_up = glm::normalize(glm::cross(camera.camera_position, camera.camera_front));
-    std::cout << camera.camera_up.x;
-    std::cout << "\n";
-    std::cout << camera.camera_up.y;
-    std::cout << "\n";
-    std::cout << camera.camera_up.z;
 		if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
 			throw std::runtime_error("failed to record command buffer!");
 		}
@@ -1776,11 +1775,6 @@ private:
 
 
   static void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
-    if(noMouseActionDone){
-    	glfwSetCursorPos(window, WIDTH/2, HEIGHT/2);
-	noMouseActionDone = false;
-
-    }
     float xoffset = xpos - last_x;
     float yoffset = last_y - ypos;
     last_x = xpos;
@@ -1806,6 +1800,11 @@ private:
 
   }
   void drawFrame() {
+    if(noMouseActionDone){
+    	glfwSetCursorPos(window, WIDTH/2, HEIGHT/2);
+	noMouseActionDone = false;
+
+    }
     vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE,
                     UINT64_MAX);
 
