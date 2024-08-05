@@ -329,9 +329,9 @@ private:
 				Vertex vertex{};
 
 				vertex.pos = {
-					attrib.vertices[3 * index.vertex_index + 0],
-					attrib.vertices[3 * index.vertex_index + 1],
-					attrib.vertices[3 * index.vertex_index + 2]
+			 attrib.vertices[3 * index.vertex_index + 0],
+			 attrib.vertices[3 * index.vertex_index + 1],
+			 attrib.vertices[3 * index.vertex_index + 2]
 				};
 
 				vertex.texCoord = {
@@ -1678,7 +1678,9 @@ private:
 
     model.Render(commandBuffer);
 
+ //   transform = glm::mat4(0.1f);
     transform = glm::inverse(camera.view);
+//    transform = transform *  glm::inverse(camera.view);
     vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &transform);
     crosshair.Render(commandBuffer);
     vkCmdEndRenderPass(commandBuffer);
@@ -1731,7 +1733,7 @@ private:
     ubo.view = camera.view;
     ubo.proj = glm::perspective(
         glm::radians(45.0f),
-        swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 15.0f);
+        swapChainExtent.width / (float)swapChainExtent.height, 0.001f, 15.0f);
     ubo.proj[1][1] *= -1;
 
     memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
