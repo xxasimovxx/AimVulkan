@@ -97,6 +97,11 @@ struct SwapChainSupportDetails {
   std::vector<VkPresentModeKHR> presentModes;
 };
 
+struct pushC {
+  glm::mat4 transform;
+  glm::vec2 cursorPos;
+};
+
 struct Vertex {
   glm::vec3 pos;
   glm::vec3 color;
@@ -457,6 +462,8 @@ private:
   UniformBufferObject ubo{};
 
   bool framebufferResized = false;
+
+  pushC pushConstant;
 
   void initWindow() {
 
@@ -1023,7 +1030,7 @@ private:
 
     VkPushConstantRange psRange{};
     psRange.offset = 0;
-    psRange.size = sizeof(glm::mat4);
+    psRange.size = sizeof(pushC);
     psRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
@@ -1673,16 +1680,16 @@ private:
                             pipelineLayout, 0, 1, &descriptorSets[currentFrame],
                             0, nullptr);
 
-    glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -5.0f));
-    vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &transform);
+    pushConstant.cursorPos = glm::vec2(last_x, last_y);
+    pushConstant.transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -5.0f));
+    vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pushC), &pushConstant);
 
     model.Render(commandBuffer);
 
- //   transform = glm::mat4(0.1f);
-    transform = glm::inverse(camera.view);
-//    transform = transform *  glm::inverse(camera.view);
-    vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &transform);
+    pushConstant.transform = glm::inverse(camera.view);
+    vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pushC), &pushConstant);
     crosshair.Render(commandBuffer);
+
     vkCmdEndRenderPass(commandBuffer);
 
 		if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
