@@ -197,11 +197,17 @@ VkDescriptorPool descriptorPool;
 class ModelLoader{
 public:
   std::vector<Vertex> vertices;
+  glm::vec3[4] hitBoxRect;
   std::vector<uint32_t> indices;
   VkBuffer vertexBuffer;
   VkDeviceMemory vertexBufferMemory;
   VkBuffer indexBuffer;
   VkDeviceMemory indexBufferMemory;
+  void createHitBoxRect(){ //LU RU RD LD
+     
+
+
+  }
 
   void Load(const char *Path) {
     loadModel(Path);
@@ -511,7 +517,7 @@ private:
     // loadModel();
     // createVertexBuffer();
     // createIndexBuffer();
-    model.Load("models/wall.obj");
+    model.Load("models/wall2.obj");
     crosshair.Load("models/crosshair.obj");
     createUniformBuffers();
     createDescriptorPool();
