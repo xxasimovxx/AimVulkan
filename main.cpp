@@ -197,16 +197,64 @@ VkDescriptorPool descriptorPool;
 class ModelLoader{
 public:
   std::vector<Vertex> vertices;
-  glm::vec3[4] hitBoxRect;
+  glm::vec3 hitBoxRect[4] = {glm::vec3(0.0f),glm::vec3(0.0f),glm::vec3(0.0f),glm::vec3(0.0f)};
   std::vector<uint32_t> indices;
   VkBuffer vertexBuffer;
   VkDeviceMemory vertexBufferMemory;
   VkBuffer indexBuffer;
   VkDeviceMemory indexBufferMemory;
   void createHitBoxRect(){ //LU RU RD LD
-     
+                           //that shit works only with rectangles, yea i know i am stupid
+                           //maybe redo it later(propably not)
+                           //me to future me, you were stupid punk an still you are yo
+    std::vector<glm::vec3> lowX;
+    std::vector<glm::vec3> highX;
+    lowX.push_back(glm::vec3(0.0f));
+    highX.push_back(glm::vec3(0.0f));
 
+    for(auto & vertex : vertices){
+      if(vertex.pos.x < lowX.back().x){
+        lowX.clear();
+        lowX.push_back(vertex.pos);
 
+      }else if(vertex.pos.x == lowX.back().x){
+        lowX.push_back(vertex.pos);
+
+      }else if(vertex.pos.x > highX.back().x){
+        highX.clear();
+        highX.push_back(vertex.pos);
+
+      }else if(vertex.pos.x == highX.back().x){
+        highX.push_back(vertex.pos);
+
+      }
+    }   
+
+    for(auto & vec : lowX){
+      if(vec.y > hitBoxRect[0].y){
+
+        hitBoxRect[0] = vec;
+      }else if(vec.y < hitBoxRect[3].y){
+
+        hitBoxRect[3] = vec;
+      }
+    }
+
+    for(auto &vec : highX){
+      if(vec.y > hitBoxRect[1].y){
+
+        hitBoxRect[1] = vec;
+      }else if(vec.y < hitBoxRect[2].y){
+
+        hitBoxRect[2] = vec;
+      }
+    }
+//    for(auto vec : hitBoxRect){
+//
+//      std::cout << vec.x << " ";
+//      std::cout << vec.y << " ";
+//      std::cout << std::endl << std::endl;
+//    }
   }
 
   void Load(const char *Path) {
@@ -465,6 +513,8 @@ private:
   std::vector<VkFence> inFlightFences;
   uint32_t currentFrame = 0;
 
+  glm::vec3 hitBoxRect[4];
+
   UniformBufferObject ubo{};
 
   bool framebufferResized = false;
@@ -518,6 +568,7 @@ private:
     // createVertexBuffer();
     // createIndexBuffer();
     model.Load("models/wall2.obj");
+    model.createHitBoxRect();
     crosshair.Load("models/crosshair.obj");
     createUniformBuffers();
     createDescriptorPool();
@@ -526,12 +577,22 @@ private:
     createSyncObjects();
   }
 
+//    auto start = std::chrono::high_resolution_clock::now(); 
+//    auto stop = std::chrono::high_resolution_clock::now();
+//    auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop - start);
   void mainLoop() {
     camera.camera_front = glm::normalize(camera.direction + center);
     while (!glfwWindowShouldClose(window)) {
+
+    //  auto start = std::chrono::high_resolution_clock::now();
+
       glfwPollEvents();
       drawFrame();
 
+     // auto stop = std::chrono::high_resolution_clock::now();
+     // auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
+
+     // std::cout << 1000000000/duration.count() << " FPS" << std::endl;
       // std::cout << camera.camera_front.x;
       // std::cout << " ";
       // std::cout << camera.camera_front.y;
@@ -1690,8 +1751,33 @@ private:
     pushConstant.transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -5.0f));
     vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pushC), &pushConstant);
 
-    model.Render(commandBuffer);
 
+    glm::vec4 temp;
+
+    for(int i = 0; i < 4; i++){
+
+      temp = glm::vec4(model.hitBoxRect[i], 1.0f) * pushConstant.transform;
+      hitBoxRect[i] = glm::vec3(temp.x, temp.y, temp.z);
+    }
+
+    float length = (hitBoxRect[0] - hitBoxRect[2]).length(); 
+    std::cout << length;
+
+    for(auto vec : hitBoxRect){
+
+      if((camera.direction - vec).length() < length){
+
+        std::cout << "as";
+      }
+    }
+
+
+    model.Render(commandBuffer);
+    
+//    auto start = std::chrono::high_resolution_clock::now(); 
+//    auto stop = std::chrono::high_resolution_clock::now();
+//    auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop - start);
+ 
     pushConstant.transform = glm::inverse(camera.view);
     vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pushC), &pushConstant);
     crosshair.Render(commandBuffer);
