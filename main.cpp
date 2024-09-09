@@ -35,12 +35,14 @@
 
 bool isKeyPressed = false;
 bool noMouseActionDone = true;
+glm::vec3 normalWall = glm::vec3(0.0f, 0.0f, 1.0f);
 
 int last_key_state = -1;
 int key_state = last_key_state;
 
 const uint32_t WIDTH = 1280;
 const uint32_t HEIGHT = 720;
+const float DISTANCE = 5.0f;
 
 // const std::string MODEL_PATH = "models/wall.obj";
 const std::string TEXTURE_PATH = "textures/texture.png";
@@ -588,6 +590,7 @@ private:
 
       glfwPollEvents();
       drawFrame();
+
 
      // auto stop = std::chrono::high_resolution_clock::now();
      // auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
@@ -1748,7 +1751,7 @@ private:
                             0, nullptr);
 
     pushConstant.cursorPos = glm::vec2(last_x, last_y);
-    pushConstant.transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -5.0f));
+    pushConstant.transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -DISTANCE));
     vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pushC), &pushConstant);
 
 
@@ -1761,8 +1764,12 @@ private:
     }
 
     float length = (hitBoxRect[0] - hitBoxRect[2]).length(); 
-    std::cout << length;
-
+//    std::cout << length;
+//      std::cout << last_x << " " << last_y << std::endl;
+//    std::cout << normalWall.x << " " << normalWall.y << " " << normalWall.z << std::endl;
+    float diff = glm::dot(camera.direction, normalWall);
+    std::cout << glm::acos(diff) * 180.0  << std::endl;
+//      std::cout << camera.direction.x << std::endl;
     for(auto vec : hitBoxRect){
 
       if((camera.direction - vec).length() < length){
@@ -1770,7 +1777,6 @@ private:
         std::cout << "as";
       }
     }
-
 
     model.Render(commandBuffer);
     
@@ -1835,6 +1841,16 @@ private:
         swapChainExtent.width / (float)swapChainExtent.height, 0.001f, 15.0f);
     ubo.proj[1][1] *= -1;
 
+    glm::vec4 normalWallvec4 = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
+    normalWallvec4 = ubo.proj * ubo.view * ubo.model * pushConstant.transform * normalWallvec4;
+//    normalWallvec4[0] *= -1;
+//    normalWallvec4[1] *= -1;
+    
+
+    normalWall.x = normalWallvec4.x;
+    normalWall.y = normalWallvec4.y;
+    normalWall.z = normalWallvec4.z;
+    normalWall = glm::normalize(normalWall);
     memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
   }
   static void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods){
@@ -1876,6 +1892,12 @@ private:
 
 
   static void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
+      if(noMouseActionDone){
+        last_x = WIDTH/2;
+        last_y = HEIGHT/2;
+    	  glfwSetCursorPos(window, last_x, last_y);
+	      noMouseActionDone = false;
+    }
     float xoffset = xpos - last_x;
     float yoffset = last_y - ypos;
     last_x = xpos;
@@ -1901,11 +1923,6 @@ private:
 
   }
   void drawFrame() {
-    if(noMouseActionDone){
-    	glfwSetCursorPos(window, WIDTH/2, HEIGHT/2);
-	noMouseActionDone = false;
-
-    }
     vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE,
                     UINT64_MAX);
 
